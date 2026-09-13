@@ -1,55 +1,108 @@
-## Quick Links
-- [Live Demo](https://ai-trading-research-assistant-five.vercel.app)
-- [AI Usage Note](./AI_USAGE_NOTE.md)
-- [Thinking Note](./THINKING_NOTE.md)
+# 📈 AI Trading Research Assistant
 
-# AI Trading Research Assistant — README
+*A mini prototype that turns a natural-language trading question into a structured, testable experiment — and asks before it assumes.*
 
-A prototype that converts a natural-language trading question into a structured, testable experiment — flagging anything it can't safely infer instead of assuming it.
+> **Example:** *"Does buying NIFTY after a 1% fall work better during high-volatility periods?"* → gets converted into a clean `EXPERIMENT` object with instrument, timeframe, entry, exit, holding period, and filters. Anything the system can't safely infer (like exit rule or holding period) is flagged for you to confirm — never silently guessed.
 
-## Architecture
+---
 
-- `client/` (React + Vite) — question input, clarify step, structured experiment view.
-- `server/` (Express) — the only part that holds the API key; exposes `POST /api/parse-question`.
+## 🔗 Quick Links
 
-**Flow:** question → server sends it to the LLM with a strict JSON-schema system prompt → LLM returns structured fields plus a `missing_required` list → frontend shows a Clarify step only for those fields (pre-filled, editable) → once confirmed, the experiment locks into a final read-only card.
+-  **Live Demo:** [ai-trading-research-assistant-five.vercel.app](https://ai-trading-research-assistant-five.vercel.app)
+- 🧠 **[Thinking Note](./THINKING_NOTE.md)**
+- 🤖 **[AI Usage Note](./AI_USAGE_NOTE.md)**
 
-## Technology Choices
+> ⚠️ **Note on the live demo:** the backend is hosted on Render's free tier, which "sleeps" after inactivity. The **first request after a while may take 20–30 seconds** to respond while the server wakes up — that's a hosting quirk, not a bug. Subsequent requests are fast.
 
-- **Frontend:** React 18 + Vite — fast dev loop, no framework overhead needed for a single-flow UI.
-- **Backend:** Node.js + Express — thin proxy so the LLM key never reaches the browser (a direct browser call was tried first and blocked by CORS, which confirmed why a server is necessary, not just safer).
-- **LLM:** Groq (Llama 3.3 / gpt-oss), called with `response_format: json_object` and a fixed schema — chosen after a free-tier router model broke JSON parsing by printing its chain-of-thought first.
-- **Database:** None for this slice — nothing needs persisting yet; see "Improve Next."
+---
 
-## Key Assumptions
+## ✨ What It Does
 
-- The brief's examples center on Indian index trading (NIFTY/BANKNIFTY); the extraction logic is written generically but was only tested against that domain.
-- "Structure the experiment" was scoped to six required fields — instrument, timeframe, entry, exit, holding period, test period — since these are the fields the brief's own example experiment lists.
-- Any field the model fills only by interpretation (e.g. reading "sharp fall" as an approximate %) is still treated as unconfirmed and routed to the Clarify step, not accepted as final.
-- Running a real backtest, persisting experiments, and multi-turn conversation were treated as explicitly out of scope, per the brief's "do not build a full platform" instruction.
+| Step | What happens |
+|---|---|
+| **Understand** | Reads your plain-English question and extracts instrument, timeframe, entry, exit, holding period, and filters |
+| **Structure** | Converts it into a clean, fixed `EXPERIMENT` schema — no free-text guessing |
+| **Clarify** | If something important is missing (it almost always is — exit rule, holding period), it asks you to confirm instead of assuming |
+| **Present** | Shows the final, locked-in experiment in a clean card, ready to be copied as JSON |
 
-## How to Run the Project
+This deliberately covers only the **Understand → Structure** slice of the larger vision (`Understand → Structure → Test → Explain → Remember`) — no backtest execution, no chat interface, no history. Just this one part, done properly.
+
+---
+
+## 🏗️ Architecture
+
+```
+trading-assistant/
+├── client/   → React + Vite frontend (deployed on Vercel)
+└── server/   → Express backend (deployed on Render)
+```
+
+```
+User types question
+       │
+       ▼
+POST /api/parse-question  ──────►  Groq LLM (strict JSON-schema prompt)
+       │                                   │
+       ▼                                   ▼
+  missing_required[]  ◄──────────  structured fields + notes
+       │
+       ▼
+Frontend shows a CLARIFY step only for missing fields
+       │
+       ▼
+Final EXPERIMENT card (locked, copyable as JSON)
+```
+
+**Why a separate backend?** Calling the LLM directly from the browser means shipping the API key to every visitor — a real security hole. The Express server is the only thing that ever sees the key.
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Tech |
+|---|---|
+| Frontend | React 18, Vite, `lucide-react` |
+| Backend | Node.js, Express |
+| LLM | [Groq](https://groq.com) (`openai/gpt-oss-20b`) — chosen for reliably returning clean JSON |
+| Hosting | Vercel (client) · Render (server) |
+
+---
+
+## 🤔 Key Assumptions
+
+- Examples center on Indian indices (NIFTY/BANKNIFTY), though the extraction logic is written generically.
+- "Structure the experiment" is scoped to six required fields: instrument, timeframe, entry, exit, holding period, test period.
+- Any field the model fills only by *interpretation* (e.g. "sharp fall" → an approximate %) is still routed through the Clarify step, never accepted as final without confirmation.
+- Real backtesting, persistence, and multi-turn conversation are explicitly out of scope for this slice.
+
+---
+
+## 🚀 Run It Locally
 
 ```bash
 # 1. Server
 cd server
-cp .env.example .env   # add your GROQ_API_KEY
+cp .env.example .env      # add your GROQ_API_KEY
 npm install
-npm start               # http://localhost:5050
+npm start                  # → http://localhost:5050
 
-# 2. Client (second terminal)
+# 2. Client (new terminal)
 cd client
 npm install
-npm run dev              # http://localhost:5173, proxies /api to the server
+npm run dev                 # → http://localhost:5173
 ```
 
-## AI Tools Used
+---
 
-Claude (claude.ai) was used to scaffold the client/server structure, design the extraction prompt, and debug three real integration failures (CORS on a direct browser call, a free model's chain-of-thought breaking JSON parsing, and a deprecated model returning 404). Full breakdown in `AI_USAGE_NOTE.md`.
+## 🤖 AI Tools Used
 
-## What I Would Improve Next
+Built with **Claude** — used for scaffolding, prompt design, and debugging three real integration failures along the way (CORS on a direct browser call, a free model breaking JSON output with its own chain-of-thought, and a deprecated model returning 404). Full story in **[AI_USAGE_NOTE.md](./AI_USAGE_NOTE.md)**.
 
-- Persist confirmed experiments (MongoDB) so recurring question patterns get faster, better-targeted clarifying questions.
-- Connect the finalized JSON to a real or mock backtesting endpoint (the brief's optional bonus) to close the loop from question to evidence.
-- Ask missing fields one at a time instead of all at once, letting earlier answers narrow later suggestions.
-- Add sanity validation (e.g. flag a holding period longer than the test period) before marking an experiment "ready."
+---
+
+## 🔮 What I'd Improve Next
+
+- [ ] Persist confirmed experiments so recurring questions get smarter clarifying prompts over time
+- [ ] Connect the finalized JSON to a real/mock backtesting endpoint (the brief's optional bonus)
+- [ ] Ask missing fields one at a time instead of all at once
+- [ ] Add sanity validation (e.g. flag a holding period longer than the test period)
