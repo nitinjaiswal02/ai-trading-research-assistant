@@ -17,6 +17,10 @@ const EXAMPLES = [
 ];
 
 export default function App() {
+  // In production (Vercel), set VITE_API_URL to your deployed server's URL
+  // (e.g. https://your-app.up.railway.app). Locally, this stays empty and
+  // Vite's dev-server proxy in vite.config.js handles /api requests instead.
+  const API_BASE = import.meta.env.VITE_API_URL || "";
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("idle"); // idle | loading | clarify | final | error
   const [experiment, setExperiment] = useState(null);
@@ -29,7 +33,7 @@ export default function App() {
     setStatus("loading");
     setErrMsg("");
     try {
-      const res = await fetch("/api/parse-question", {
+      const res = await fetch(`${API_BASE}/api/parse-question`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question: q }),
@@ -93,7 +97,7 @@ export default function App() {
         <header style={styles.header}>
           <div style={styles.headerTop}>
             <span style={styles.dot} />
-            <span style={styles.kicker}>AI TRADING RESEARCH ASSISTANT — PROTOTYPE</span>
+            <span style={styles.kicker}>AI TRADING RESEARCH ASSISTANT </span>
           </div>
           <h1 style={styles.h1}>Turn a trading question into a testable experiment.</h1>
           <p style={styles.sub}>
